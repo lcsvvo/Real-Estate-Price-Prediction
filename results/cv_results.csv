@@ -1,0 +1,4 @@
+model,cv_rmse,fold_std
+ElasticNet,30077,7384
+Ridge,30078,7397
+Lasso,30259,7013
