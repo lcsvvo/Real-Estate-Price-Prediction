@@ -34,21 +34,19 @@ Ames Housing 주택 가격 회귀 프로젝트. 모델을 완성한 뒤 직접 �
 
 **의미.** 이 저장소의 핵심은 점수가 아니라 **코드가 보고서대로 동작하는지 검증하고 고치는 과정**이다.
 
-## Role
-
-- **Individual Project** — 모델링·감사·수정 전 과정 단독 수행
-- **Goal Shift** — 초기 목표(예측 성능) → 결과 재검증·수정으로 전환
-- **End-to-End** — 모델링 → Self-Audit → 구조적 수정
-
 ---
 
 ## 왜 중요한가
 
-대부분의 포트폴리오는 가장 좋은 결과만 보여준다. 이 프로젝트는 반대로, 이미 2위를 한 모델을 **스스로 가장 보수적인 기준으로 다시 검토**한 기록이다.
+대부분의 포트폴리오는 가장 좋은 결과만 보여준다. 이 프로젝트는 반대로, 이미 2위를 한 모델을 **가장 엄격한 기준(데이터 누수·교차검증 설계)으로 스스로 재검토**한 기록이다. 기존 분석을 방어하지 않고, 모든 지적을 원본 CSV로 재현해(원본 CV RMSE 30,129.947을 소수점까지 복원) 경험적으로 확인했다.
 
-감사 기준은 "교수가 데이터 누수와 교차검증 설계를 가장 엄격하게 본다"는 가정이었다. 기존 분석을 방어하지 않고, 모든 지적을 원본 CSV로 재현해(원본 CV RMSE 30,129.947을 소수점까지 복원) 경험적으로 확인했다.
+결과적으로 헤드라인 모델은 보고서가 설명하는 모델과 달랐다. 좋은 점수가 정직한 보고서를 보장하지 않으며, 그 간극을 찾아 고치는 과정이 이 프로젝트가 보여주려는 역량이다.
 
-결과적으로 헤드라인 모델이 보고서가 설명하는 모델과 달랐다. 좋은 점수가 정직한 보고서를 보장하지 않는다는 것, 그리고 그 간극을 어떻게 찾아 고치는지가 이 프로젝트가 보여주려는 역량이다.
+## 내 역할
+
+- **개인 프로젝트** — 모델링·감사·수정 전 과정 단독 수행
+- **목표 전환** — 초기 목표(예측 성능) → 결과 재검증·수정
+- **전 과정 수행** — 모델링 → Self-Audit → 구조적 수정
 
 ---
 
@@ -105,6 +103,11 @@ Ridge·Lasso·ElasticNet을 5-Fold CV(`shuffle=True, random_state=42`) `GridSear
 
 이 프로젝트의 핵심. 완성된 노트북을 데이터 누수·교차검증 설계·코드 정합성 관점에서 재검토하고, 모든 지적을 원본 CSV로 재현해 판정했다.
 
+<p align="center">
+  <img src="results/audit_flow.png" width="760" alt="Self-Audit flow: Original Model to Audit to Issue Detection to Pipeline Refactoring to Validation"><br>
+  <sub><b>Figure 2.</b> Self-Audit 프로세스 — 완성된 모델을 감사 기준으로 재검토해 구조적으로 수정한 흐름.</sub>
+</p>
+
 ### 발견된 문제
 
 | # | 문제 | 검증 | 판정 |
@@ -121,4 +124,86 @@ Ridge·Lasso·ElasticNet을 5-Fold CV(`shuffle=True, random_state=42`) `GridSear
 
 | 항목 | Before | After |
 |---|---|---|
-| 파생변수 | 모델에서 누�
+| 파생변수 | 모델에서 누락 | `FunctionTransformer`로 Pipeline에 반영 |
+| 희귀범주 | dead code | `OneHotEncoder(min_frequency=0.01)` |
+| 전처리 | CV 밖 fit (누수) | `Pipeline`/`ColumnTransformer` 내부 fit |
+| 성능 보고 | 그리드 최솟값(낙관) | Nested CV + held-out |
+| 변수중요도 | 근거 코드 없음 | 계수 직접 산출 |
+| 재현성 | 비멱등 | 멱등(Run-All 안정) |
+
+---
+
+## 최종 결과
+
+- Private Test M **0.8708 / 전체 2위 / Train–Test Gap 1.0%** (대회 리더보드).
+- 누수 제거 후 CV RMSE ≈ 30,100 (±7,300).
+- 실제 가격 결정 요인(계수 기준): **입지(Neighborhood) > 건물 유형 > 지상 면적 > 전반 품질**.
+- 동일 과제에서 한 팀이 Gap 86%로 붕괴한 것과 달리 Gap 1.0% → 안정적 일반화의 근거.
+
+---
+
+## 핵심 요약
+
+- CV 점수 차이는 fold 표준편차와 함께 해석해야 한다 — 작은 차이로 우열을 주장하면 안 된다.
+- 좋은 결과 ≠ 정직한 보고서. 코드가 보고서대로 동작하는지는 별도 검증이 필요하다.
+- `Pipeline`/`ColumnTransformer`로 데이터 누수를 구조적으로 차단한다.
+- Private Test의 작은 Gap이 일반화의 진짜 증거다.
+
+---
+
+<details>
+<summary><b>재현</b></summary>
+
+<br>
+
+```bash
+git clone https://github.com/jiwooo411/Real-Estate-Price-Prediction.git
+cd Real-Estate-Price-Prediction
+pip install -r requirements.txt
+
+jupyter notebook notebooks/01_final_model_corrected.ipynb   # 누수 없는 재구현 (대표)
+jupyter notebook notebooks/02_report_annotated.ipynb        # 원본 보고서 + Audit 정정
+```
+
+원본 CV RMSE 30,129.947을 소수점까지 재현, 저장 모델(`results/model.pkl`) reload 예측 일치 확인. 누수 없는 대표 노트북은 Run-All로 동일 결과 산출(멱등). 대회 원본 데이터는 라이선스상 미포함.
+
+</details>
+
+<details>
+<summary><b>협업 규칙</b></summary>
+
+<br>
+
+개인 저장소이지만 협업 흐름 적용. AI 에이전트(Claude · Codex 등) 작업 시에도 동일 규칙 준수. 상세: [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+- **흐름.** `main` pull → 작업 브랜치 → commit → push → PR → 리뷰 → merge.
+- **브랜치 네이밍.** `<type>/<short-topic>`. `claude/*`·`codex/*` 임의 브랜치 금지.
+- **커밋.** [Conventional Commits](https://www.conventionalcommits.org) — `feat`·`fix`·`docs`·`refactor`·`chore`.
+
+</details>
+
+---
+
+## 저장소 구조
+
+```
+.
+├── README.md · CONTRIBUTING.md · requirements.txt
+├── notebooks/
+│   ├── 01_final_model_corrected.ipynb   # 대표: 누수 없는 재구현
+│   └── 02_report_annotated.ipynb        # 원본 보고서 + Audit 정정
+├── audit/
+│   └── audit_report.md                  # 감사 보고서 (C1~C4 · M1~M7)
+├── reports/
+│   ├── original_report.pdf · corrected_report.pdf
+│   └── process_log.ipynb                # 탐색 기록(참고)
+├── results/
+│   ├── leaderboard_result.png · submission_test.csv
+│   ├── cv_results.csv · model.pkl
+└── data/
+    └── data_description.md              # 원본 데이터는 비공개(.gitignore)
+```
+
+---
+
+<sub>모든 수치는 실제 데이터로 재현·검증됨 · 데이터셋: Ames Housing (De Cock, 2011) · 대회 원본 데이터는 라이선스상 미포함.</sub>
