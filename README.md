@@ -1,8 +1,6 @@
 # Ames Housing Price Prediction
 ### 내가 만든 모델을 스스로 감사하다 — 코드–보고서 불일치를 찾아 고친 기록
 
-**The model in the report was not the model I submitted. I found it by auditing my own work.**
-
 Ames Housing 주택 가격 회귀 프로젝트. 모델을 완성한 뒤 직접 감사(audit)해 코드–보고서 불일치·dead code·데이터 누수를 찾아내고, 재현 가능한 형태로 수정한 기록
 
 ![Data](https://img.shields.io/badge/data-Ames%20Housing-blue)
@@ -46,7 +44,7 @@ Ames Housing 주택 가격 회귀 프로젝트. 모델을 완성한 뒤 직접 �
 
 - **개인 프로젝트** — 모델링·감사·수정 전 과정 단독 수행
 - **목표 전환** — 초기 목표(예측 성능) → 결과 재검증·수정
-- **전 과정 수행** — 모델링 → Self-Audit → 구조적 수정
+- **전 과정 수행** — 모델링 → 자기 감사 → 구조적 수정
 
 ---
 
@@ -99,13 +97,13 @@ Ridge·Lasso·ElasticNet을 5-Fold CV(`shuffle=True, random_state=42`) `GridSear
 
 ---
 
-## 자기 감사 (Self-Audit)
+## 자기 감사
 
 이 프로젝트의 핵심. 완성된 노트북을 데이터 누수·교차검증 설계·코드 정합성 관점에서 재검토하고, 모든 지적을 원본 CSV로 재현해 판정했다.
 
 <p align="center">
   <img src="results/audit_flow.png" width="760" alt="Self-Audit flow: Original Model to Audit to Issue Detection to Pipeline Refactoring to Validation"><br>
-  <sub><b>Figure 2.</b> Self-Audit 프로세스 — 완성된 모델을 감사 기준으로 재검토해 구조적으로 수정한 흐름.</sub>
+  <sub><b>Figure 2.</b> 자기 감사 프로세스 — 완성된 모델을 감사 기준으로 재검토해 구조적으로 수정한 흐름.</sub>
 </p>
 
 ### 발견된 문제
@@ -147,7 +145,7 @@ Ridge·Lasso·ElasticNet을 5-Fold CV(`shuffle=True, random_state=42`) `GridSear
 - CV 점수 차이는 fold 표준편차와 함께 해석해야 한다 — 작은 차이로 우열을 주장하면 안 된다.
 - 좋은 결과 ≠ 정직한 보고서. 코드가 보고서대로 동작하는지는 별도 검증이 필요하다.
 - `Pipeline`/`ColumnTransformer`로 데이터 누수를 구조적으로 차단한다.
-- Private Test의 작은 Gap이 일반화의 진짜 증거다.
+- 작은 Train–Test Gap은 모델의 일반화 가능성을 시사한다.
 
 ---
 
