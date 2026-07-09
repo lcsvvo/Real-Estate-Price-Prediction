@@ -1,68 +1,46 @@
 # Ames Housing Price Prediction
-### 내가 만든 모델을 스스로 감사하다 — 코드–보고서 불일치를 찾아 고친 기록
+### 규제 선형모형으로 주택 가격을 예측하고, 모델 간 성능 차이가 유의미한지까지 검증
 
-Ames Housing 주택 가격 회귀 프로젝트. 모델을 완성한 뒤 직접 감사(audit)해 코드–보고서 불일치·dead code·데이터 누수를 찾아내고, 재현 가능한 형태로 수정한 기록
+**31개 변수로 Ames 주택 가격을 예측하고, 후보 모델 간 차이가 실제로 의미 있는지 fold 변동성까지 함께 본 회귀 프로젝트.**
 
-![Data](https://img.shields.io/badge/data-Ames%20Housing-blue)
-![Task](https://img.shields.io/badge/task-regression-blueviolet)
-![Metric](https://img.shields.io/badge/metric-RMSE%20·%20R²-informational)
-![Result](https://img.shields.io/badge/private-2위%20·%20gap%201.0%25-success)
-![Python](https://img.shields.io/badge/python-3.x-3776AB?logo=python&logoColor=white)
+개인 프로젝트. 문제 정의부터 feature engineering · 모델 비교 · 비편향 성능 추정 · 해석까지 전 과정 수행.
 
-<p align="center">
-  <img src="results/leaderboard_result.png" width="760" alt="Private 리더보드 2위, Train-Test Gap 1.0%"><br>
-  <sub><b>Figure 1.</b> Private Test M <b>0.8708 · 전체 2위 · Train–Test Gap 1.0%</b>. 단, 감사 결과 이 2위는 보고서가 "핵심"이라 설명한 파생변수 <b>없이</b> 달성된 것 — 그 정보는 이미 원천 변수에 담겨 있었다.</sub>
-</p>
+![Data](https://img.shields.io/badge/data-Ames%20Housing%202.3K-blue)
+![Task](https://img.shields.io/badge/task-price%20regression-blueviolet)
+![Metric](https://img.shields.io/badge/metric-RMSE-informational)
+![Method](https://img.shields.io/badge/method-Regularized%20Linear%20%2B%20FE-orange)
+![Python](https://img.shields.io/badge/python-3776AB?logo=python&logoColor=white)
 
-> 대회 원본 CSV는 라이선스상 미포함(`.gitignore`). 코드·노트북·감사 보고서·결과표만 공개. → [`data/data_description.md`](data/data_description.md)
+> 대회 원본 데이터는 라이선스상 미포함(`.gitignore`). 코드·설명·결과표만 공개. → [`data/README.md`](data/README.md)
 
 ---
 
-## 30초 요약
+## 요약
 
-**질문.** 좋은 리더보드 점수가 곧 신뢰할 수 있는 분석인가. 내가 보고한 모델은 실제로 내가 제출한 모델과 같은가.
-
-**핵심 발견.**
-- Private 2위(M 0.8708, Gap 1.0%)는 보고서가 "핵심"이라던 파생변수 **없이** 달성 — 제출 모델은 74 feature, 파생변수 부재.
-- 희귀범주 병합은 **dead code**였고, 변수중요도 해석은 산출 코드가 **없었다**.
-- 전처리를 CV 밖에서 fit한 **스케일링 누수** 존재(영향은 소, 약 50 RMSE).
-- 5개 지적 중 3개 CONTRADICTED · 1개 UNSUPPORTED — 모두 원본 CSV로 재현해 확인.
-
-**방법.** 규제 선형회귀(Ridge·Lasso·ElasticNet) 5-Fold CV 튜닝 → 자기 감사(누수·CV 설계·코드 정합성) → `Pipeline`/`ColumnTransformer`로 구조적 수정.
-
-**의미.** 이 저장소의 핵심은 점수가 아니라 **코드가 보고서대로 동작하는지 검증하고 고치는 과정**이다.
+**질문.** 어떤 규제 선형모형이 Ames 주택 가격을 가장 잘 예측하며, 후보 간 차이는 유의한가.
+**데이터.** Ames Housing 2,344행 × 31변수(수치형 16 · 범주형 15), 타깃 `sale_price`.
+**방법.** 결측 대치 · 순서형/명목형 인코딩 · 표준화 · 파생변수(`total_sf`·`house_age`) → Ridge/Lasso/ElasticNet inner-CV 튜닝 → Nested CV 비편향 추정 → held-out 확인.
+**결과.** ElasticNet CV RMSE 30,077(fold std 7,384) 선택. 단, 모델 간 차이는 fold 표준편차의 수% 이내로 노이즈 수준.
+**역할.** 개인 프로젝트, 전 과정.
 
 ---
 
-## 왜 중요한가
+## 문제 정의
 
-대부분의 포트폴리오는 가장 좋은 결과만 보여준다. 이 프로젝트는 반대로, 이미 2위를 한 모델을 **가장 엄격한 기준(데이터 누수·교차검증 설계)으로 스스로 재검토**한 기록이다. 기존 분석을 방어하지 않고, 모든 지적을 원본 CSV로 재현해(원본 CV RMSE 30,129.947을 소수점까지 복원) 경험적으로 확인했다.
-
-결과적으로 헤드라인 모델은 보고서가 설명하는 모델과 달랐다. 좋은 점수가 정직한 보고서를 보장하지 않으며, 그 간극을 찾아 고치는 과정이 이 프로젝트가 보여주려는 역량이다.
-
-## 내 역할
-
-- **개인 프로젝트** — 모델링·감사·수정 전 과정 단독 수행
-- **목표 전환** — 초기 목표(예측 성능) → 결과 재검증·수정
-- **전 과정 수행** — 모델링 → 자기 감사 → 구조적 수정
+Ames Housing 데이터로 주택 판매가(`sale_price`)를 예측한다. 수치·순서·명목형이 섞인 31개 변수를 다루며, 목표는 최고 점수 자체가 아니라 재현 가능한 파이프라인에서 모델을 비교·선택하고 그 차이를 정직하게 해석하는 것.
 
 ---
 
-<details>
-<summary><b>데이터</b></summary>
-
-<br>
+## 데이터 이해
 
 | 항목 | 내용 |
 |---|---|
-| 데이터셋 | Ames Housing (De Cock, 2011) — 아이오와 주택 거래 |
-| 규모 | 학습 2,344행 · 31개 변수 (수치형 16 · 범주형 15) · 타깃 `sale_price` |
-| 타깃 분포 | 양의 왜도(약 1.75), 우측 꼬리 — 고가 주택은 이상치가 아닌 실제 패턴으로 보고 삭제 대신 규제로 대응 |
-| 결측 처리 | 구조적(시설 없음 → `None`/`0`)과 비구조적(Train 기준 중앙값/최빈값) 구분, 모든 통계는 **Train 기준** |
+| 자료원 | Ames Housing (De Cock, 2011) |
+| 규모 | train 2,344행 · 31변수(수치형 16 · 범주형 15) |
+| 타깃 | `sale_price` — 우편향 분포(로그 변환 실험 → 미채택) |
+| 변수 예 | 수치 `gr_liv_area`·`total_bsmt_sf`·`overall_qual` / 순서 `exter_qual`·`kitchen_qual` / 명목 `neighborhood`·`ms_zoning` |
 
-> 변수 처리 상세: [`data/data_description.md`](data/data_description.md).
-
-</details>
+> 변수 정의·전처리 매핑 상세: [`data/README.md`](data/README.md).
 
 ---
 
@@ -70,84 +48,104 @@ Ames Housing 주택 가격 회귀 프로젝트. 모델을 완성한 뒤 직접 �
 
 | 구분 | 도구 |
 |---|---|
-| 언어 | Python 3.x |
-| 데이터 처리 | pandas · numpy |
-| 모델·검증 | scikit-learn — Ridge · Lasso · ElasticNet · `Pipeline` · `ColumnTransformer` · `GridSearchCV` |
-| 직렬화 | joblib (`model.pkl`) |
-| 시각화 | matplotlib · seaborn |
+| 언어 | Python |
+| 데이터 처리 | pandas, numpy |
+| 모델·검증 | scikit-learn (Ridge, Lasso, ElasticNet, Pipeline, ColumnTransformer, GridSearchCV, Nested CV) |
+| 시각화 | matplotlib, seaborn |
 
 ---
 
+## Feature Engineering
+
+| 단계 | 처리 |
+|---|---|
+| 결측 대치 | 수치형 중앙값 · 범주형 최빈값 (CV 내부 fit — 누수 차단) |
+| 순서형 인코딩 | `exter_qual`·`kitchen_qual`·`bsmt_qual` 등급 매핑(OrdinalEncoder) |
+| 명목형 인코딩 | `neighborhood`·`bldg_type`·`ms_zoning` 원-핫(`min_frequency`로 희소범주 병합) |
+| 표준화 | StandardScaler |
+| 파생변수 | `total_sf`(면적 합) · `house_age`(주택 연령) |
+
+> 로그 변환·이상치 윈저라이징은 실험 후 미채택 — 근거는 Appendix.
+
+---
+
+## 모델 비교 및 선택
+
+Ridge · Lasso · ElasticNet을 inner CV(GridSearchCV)로 튜닝하고, fold 표준편차와 함께 비교했다.
+
+| 모델 | CV RMSE | fold std |
+|---|---:|---:|
+| **ElasticNet (선택)** | **30,077** | 7,384 |
+| Ridge | 30,078 | 7,397 |
+| Lasso | 30,259 | 7,013 |
+
+> 모델 간 최대 차이(182)는 fold 표준편차(약 7,400)의 2.5% 수준 → 순위는 통계적 노이즈에 가깝다. ElasticNet은 성능 우위가 아니라 이중 규제(L1+L2)의 견고성을 근거로 선택.
+
+---
+
+## 성능 평가
+
+- Nested CV — 하이퍼파라미터 선택과 성능 추정을 분리해 비편향 일반화 성능을 추정.
+- Held-out 테스트 — 선택과 독립된 최종 확인.
+
+---
+
+## 주요 결과
+
+- 세 규제 모형의 CV RMSE는 30,077–30,259로, 차이가 fold 변동성 안에 들어온다 → 모델 선택보다 feature engineering·검증 설계가 성능을 좌우.
+- 변수 중요도는 전체 데이터로 재적합한 계수 기반으로 산출(노트북 §6, 결론은 §8). 입지(`neighborhood`)·건물 유형(`bldg_type`)·지상 거주면적(`gr_liv_area`)·전반적 품질(`overall_qual`) 순으로 가격에 영향을 미쳤다.
+
+---
+
+## 인사이트
+
+- 후보 모델 간 성능차가 노이즈 수준이라는 것 자체가 결과 — "어떤 규제모형이냐"에 과의미 부여하지 않는다.
+- 파생변수(`total_sf`)를 실제 학습에 반영했는지, 전처리를 CV 안에서 했는지가 성능·해석의 신뢰도를 결정.
+
+---
+
+## 역할
+
+| 영역 | 기여 |
+|---|---|
+| 문제 정의 | 점수 경쟁이 아닌 "모델 비교·선택의 정직한 해석"으로 목표 설정 |
+| Feature Engineering | 결측·인코딩·표준화·파생변수 설계 |
+| 모델링 | Ridge/Lasso/ElasticNet inner-CV 튜닝, fold std 병기 |
+| 검증 | Nested CV 비편향 추정 · held-out 확인 |
+
+**정직한 경계.** 모델 간 성능차는 노이즈 수준으로 SOTA 주장 아님 · 관측 데이터 예측이며 인과 아님 · 원본 노트북의 결함을 수정한 재현본이 정본.
+
+---
+
+## Lessons Learned
+
+모델을 완성한 뒤 직접 감사하여, 보고서가 설명하는 모델과 실제 학습 모델이 다르다는 점을 발견하고 누수 없는 재현 파이프라인으로 재구축했다.
+
+| 발견 | 수정 |
+|---|---|
+| 파생변수(`total_sf`·`house_age`)가 최종 모델에 미반영 | 파이프라인에 실제 반영 |
+| 결측 대치·스케일링을 CV 밖에서 fit(누수) | CV 내부로 이동 |
+| 모델 선택 CV로 성능까지 보고(낙관 편향) | Nested CV로 비편향 추정 분리 |
+| 변수 중요도 해석이 코드로 산출된 적 없음 | 실제 coefficient 산출 |
+
+> 감사 전 과정: [`audit/audit_report.md`](audit/audit_report.md).
+
+---
+
+## Appendix
+
 <details>
-<summary><b>모델링 — 세 모델은 통계적으로 동등</b></summary>
+<summary><b>의사결정 기록</b></summary>
 
 <br>
 
-Ridge·Lasso·ElasticNet을 5-Fold CV(`shuffle=True, random_state=42`) `GridSearchCV`로 튜닝.
+- 로그 변환 미채택 — `sale_price` 우편향에 log1p를 실험했으나 변별력·해석(금액 기준) 측면에서 원 스케일 유지.
+- 윈저라이징 미적용 — 고가 주택을 이상치로 잘라내기보다 원본성 유지, 규제로 대응.
+- 명시적 단계 vs Pipeline — 정정본은 누수 차단을 위해 전처리를 CV 파이프라인 안으로 통합.
 
-| 모델 | CV RMSE | fold 표준편차 |
-|---|:---:|:---:|
-| ElasticNet (α=0.01, l1=0.5) | 30,077 | ± 7,384 |
-| Ridge (α=10) | 30,078 | ± 7,397 |
-| Lasso (α=1.0) | 30,259 | ± 7,013 |
-
-모델 간 평균 차이(약 180) ≪ fold 표준편차(약 7,300) → 세 모델은 통계적으로 동등. 최종 모델은 성능 우위가 아니라 **단순성·계수 안정성**을 근거로 ElasticNet 선택. ("최고/가장 견고"라는 주장은 데이터가 뒷받침하지 않아 하지 않음.)
+원본·정정 보고서: [`reports/`](reports/).
 
 </details>
-
----
-
-## 자기 감사
-
-이 프로젝트의 핵심. 완성된 노트북을 데이터 누수·교차검증 설계·코드 정합성 관점에서 재검토하고, 모든 지적을 원본 CSV로 재현해 판정했다.
-
-<p align="center">
-  <img src="results/audit_flow.png" width="760" alt="Self-Audit flow: Original Model to Audit to Issue Detection to Pipeline Refactoring to Validation"><br>
-  <sub><b>Figure 2.</b> 자기 감사 프로세스 — 완성된 모델을 감사 기준으로 재검토해 구조적으로 수정한 흐름.</sub>
-</p>
-
-### 발견된 문제
-
-| # | 문제 | 검증 | 판정 |
-|---|---|---|---|
-| 1 | 파생변수(`total_sf`,`house_age`)가 변수 덮어쓰기로 제출 모델에서 누락 | 제출 파일 74 feature(파생 부재) 확인 | CONTRADICTED |
-| 2 | 희귀범주(Rare) 병합이 `df_train`만 수정 → dead code | `X_train`에 `'Rare'` 없음 | CONTRADICTED |
-| 3 | 변수중요도 해석에 산출 코드 없음 | 전 셀 검토 | UNSUPPORTED |
-| 4 | 전처리가 CV 밖에서 fit → 스케일링 누수 | 누수 전후 CV 비교(영향 약 50 RMSE) | 사실, 영향 소 |
-| 5 | 버전 불일치: `과정기록`(파생 포함) vs 제출 모델(파생 미포함) | 두 파일 비교 | CONTRADICTED |
-
-> 즉, Private 2위 성과는 파생변수 없이 달성된 것이며 그 정보는 원천 변수(`gr_liv_area` 등)에 이미 담겨 있었다. 전체 감사 보고서: [`audit/audit_report.md`](audit/audit_report.md).
-
-### 수정 내용
-
-| 항목 | Before | After |
-|---|---|---|
-| 파생변수 | 모델에서 누락 | `FunctionTransformer`로 Pipeline에 반영 |
-| 희귀범주 | dead code | `OneHotEncoder(min_frequency=0.01)` |
-| 전처리 | CV 밖 fit (누수) | `Pipeline`/`ColumnTransformer` 내부 fit |
-| 성능 보고 | 그리드 최솟값(낙관) | Nested CV + held-out |
-| 변수중요도 | 근거 코드 없음 | 계수 직접 산출 |
-| 재현성 | 비멱등 | 멱등(Run-All 안정) |
-
----
-
-## 최종 결과
-
-- Private Test M **0.8708 / 전체 2위 / Train–Test Gap 1.0%** (대회 리더보드).
-- 누수 제거 후 CV RMSE ≈ 30,100 (±7,300).
-- 실제 가격 결정 요인(계수 기준): **입지(Neighborhood) > 건물 유형 > 지상 면적 > 전반 품질**.
-- 동일 과제에서 한 팀이 Gap 86%로 붕괴한 것과 달리 Gap 1.0% → 안정적 일반화의 근거.
-
----
-
-## 핵심 요약
-
-- CV 점수 차이는 fold 표준편차와 함께 해석해야 한다 — 작은 차이로 우열을 주장하면 안 된다.
-- 좋은 결과 ≠ 정직한 보고서. 코드가 보고서대로 동작하는지는 별도 검증이 필요하다.
-- `Pipeline`/`ColumnTransformer`로 데이터 누수를 구조적으로 차단한다.
-- 작은 Train–Test Gap은 모델의 일반화 가능성을 시사한다.
-
----
 
 <details>
 <summary><b>재현</b></summary>
@@ -158,25 +156,9 @@ Ridge·Lasso·ElasticNet을 5-Fold CV(`shuffle=True, random_state=42`) `GridSear
 git clone https://github.com/jiwooo411/Real-Estate-Price-Prediction.git
 cd Real-Estate-Price-Prediction
 pip install -r requirements.txt
-
-jupyter notebook notebooks/01_final_model_corrected.ipynb   # 누수 없는 재구현 (대표)
-jupyter notebook notebooks/02_report_annotated.ipynb        # 원본 보고서 + Audit 정정
+# data/README.md 안내대로 data/raw/ 에 원본 CSV 배치
+jupyter notebook notebooks/01_final_model_corrected.ipynb
 ```
-
-원본 CV RMSE 30,129.947을 소수점까지 재현, 저장 모델(`results/model.pkl`) reload 예측 일치 확인. 누수 없는 대표 노트북은 Run-All로 동일 결과 산출(멱등). 대회 원본 데이터는 라이선스상 미포함.
-
-</details>
-
-<details>
-<summary><b>협업 규칙</b></summary>
-
-<br>
-
-개인 저장소이지만 협업 흐름 적용. AI 에이전트(Claude · Codex 등) 작업 시에도 동일 규칙 준수. 상세: [`CONTRIBUTING.md`](CONTRIBUTING.md).
-
-- **흐름.** `main` pull → 작업 브랜치 → commit → push → PR → 리뷰 → merge.
-- **브랜치 네이밍.** `<type>/<short-topic>`. `claude/*`·`codex/*` 임의 브랜치 금지.
-- **커밋.** [Conventional Commits](https://www.conventionalcommits.org) — `feat`·`fix`·`docs`·`refactor`·`chore`.
 
 </details>
 
@@ -186,22 +168,10 @@ jupyter notebook notebooks/02_report_annotated.ipynb        # 원본 보고서 +
 
 ```
 .
-├── README.md · CONTRIBUTING.md · requirements.txt
-├── notebooks/
-│   ├── 01_final_model_corrected.ipynb   # 대표: 누수 없는 재구현
-│   └── 02_report_annotated.ipynb        # 원본 보고서 + Audit 정정
-├── audit/
-│   └── audit_report.md                  # 감사 보고서 (C1~C4 · M1~M7)
-├── reports/
-│   ├── original_report.pdf · corrected_report.pdf
-│   └── process_log.ipynb                # 탐색 기록(참고)
-├── results/
-│   ├── leaderboard_result.png · submission_test.csv
-│   ├── cv_results.csv · model.pkl
-└── data/
-    └── data_description.md              # 원본 데이터는 비공개(.gitignore)
+├── notebooks/   # 01_final_model_corrected(정본) · 02_report_annotated(보고서 주석본)
+├── data/        # 데이터 설명 (원본 미포함) → data/README.md
+├── audit/       # 감사 보고서 (Lessons 근거)
+├── reports/     # 보고서 원본·정정본 (PDF)
+├── results/     # cv_results.csv · 예측 산출·그림
+└── archive/     # 초기 과정·구버전 노트북 (비정본 보존)
 ```
-
----
-
-<sub>모든 수치는 실제 데이터로 재현·검증됨 · 데이터셋: Ames Housing (De Cock, 2011) · 대회 원본 데이터는 라이선스상 미포함.</sub>
