@@ -55,7 +55,7 @@ Ames Housing 데이터로 주택 판매가(`sale_price`)를 예측한다. 수치
 
 ---
 
-## Feature Engineering
+## 변수 생성 및 전처리
 
 | 단계 | 처리 |
 |---|---|
@@ -117,7 +117,7 @@ Ridge · Lasso · ElasticNet을 inner CV(GridSearchCV)로 튜닝하고, fold 표
 
 ---
 
-## Lessons Learned
+## 배운 점
 
 모델을 완성한 뒤 직접 감사하여, 보고서가 설명하는 모델과 실제 학습 모델이 다르다는 점을 발견하고 누수 없는 재현 파이프라인으로 재구축했다.
 
@@ -132,7 +132,7 @@ Ridge · Lasso · ElasticNet을 inner CV(GridSearchCV)로 튜닝하고, fold 표
 
 ---
 
-## Appendix
+## 부록
 
 <details>
 <summary><b>의사결정 기록</b></summary>
