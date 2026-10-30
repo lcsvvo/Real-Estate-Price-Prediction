@@ -57,11 +57,11 @@ Ames 주택 특성으로 **판매가를 예측**하고 Ridge, Lasso, ElasticNet�
 
 ```mermaid
 flowchart LR
-    A["주택 자료 로드"] --> B["학습 / Held-out 분리"]
-    B --> C["전처리, 파생변수<br/>Pipeline"]
-    C --> D["Ridge / Lasso / ElasticNet<br/>CV 비교, 튜닝"]
+    A["주택 자료 로드"] --> B["학습 자료<br/>Held-out 분리"]
+    B --> C["전처리<br/>파생변수<br/>Pipeline"]
+    C --> D["Ridge, Lasso<br/>ElasticNet<br/>CV 튜닝"]
     D --> E["Nested CV<br/>Held-out 평가"]
-    E --> F["전체 자료 재학습<br/>계수, Private 예측"]
+    E --> F["전체 재학습<br/>계수 해석<br/>Private 예측"]
     classDef step fill:#ede9fe,stroke:#8b5cf6,color:#111827;
     class B,C,D,E step;
 ```
