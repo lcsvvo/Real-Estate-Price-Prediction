@@ -1,177 +1,105 @@
 # Ames Housing Price Prediction
-### 규제 선형모형으로 주택 가격을 예측하고, 모델 간 성능 차이가 유의미한지까지 검증
 
-**31개 변수로 Ames 주택 가격을 예측하고, 후보 모델 간 차이가 실제로 의미 있는지 fold 변동성까지 함께 본 회귀 프로젝트.**
+## Overview
 
-개인 프로젝트. 문제 정의부터 feature engineering · 모델 비교 · 비편향 성능 추정 · 해석까지 전 과정 수행.
+Ames 주택 특성으로 **판매가를 예측**하고 Ridge, Lasso, ElasticNet의 오차를 비교. 모델별 평균 오차와 교차검증 fold의 변동성을 함께 확인.
 
-![Data](https://img.shields.io/badge/data-Ames%20Housing%202.3K-blue)
-![Task](https://img.shields.io/badge/task-price%20regression-blueviolet)
-![Metric](https://img.shields.io/badge/metric-RMSE-informational)
-![Method](https://img.shields.io/badge/method-Regularized%20Linear%20%2B%20FE-orange)
-![Python](https://img.shields.io/badge/python-3776AB?logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white) ![pandas](https://img.shields.io/badge/pandas-150458?style=flat&logo=pandas&logoColor=white) ![scikit-learn](https://img.shields.io/badge/scikit--learn-F7931E?style=flat&logo=scikitlearn&logoColor=white)
 
-> 대회 원본 데이터는 라이선스상 미포함(`.gitignore`). 코드·설명·결과표만 공개. → [`data/README.md`](data/README.md)
+## Data
 
----
-
-## 요약
-
-**질문.** 어떤 규제 선형모형이 Ames 주택 가격을 가장 잘 예측하며, 후보 간 차이는 유의한가.
-**데이터.** Ames Housing 2,344행 × 31변수(수치형 16 · 범주형 15), 타깃 `sale_price`.
-**방법.** 결측 대치 · 순서형/명목형 인코딩 · 표준화 · 파생변수(`total_sf`·`house_age`) → Ridge/Lasso/ElasticNet inner-CV 튜닝 → Nested CV 비편향 추정 → held-out 확인.
-**결과.** ElasticNet CV RMSE 30,077(fold std 7,384) 선택. 단, 모델 간 차이는 fold 표준편차의 수% 이내로 노이즈 수준.
-**역할.** 개인 프로젝트, 전 과정.
-
----
-
-## 문제 정의
-
-Ames Housing 데이터로 주택 판매가(`sale_price`)를 예측한다. 수치·순서·명목형이 섞인 31개 변수를 다루며, 목표는 최고 점수 자체가 아니라 재현 가능한 파이프라인에서 모델을 비교·선택하고 그 차이를 정직하게 해석하는 것.
-
----
-
-## 데이터 이해
-
-| 항목 | 내용 |
+| Item | Details |
 |---|---|
-| 자료원 | Ames Housing (De Cock, 2011) |
-| 규모 | train 2,344행 · 31변수(수치형 16 · 범주형 15) |
-| 타깃 | `sale_price` — 우편향 분포(로그 변환 실험 → 미채택) |
-| 변수 예 | 수치 `gr_liv_area`·`total_bsmt_sf`·`overall_qual` / 순서 `exter_qual`·`kitchen_qual` / 명목 `neighborhood`·`ms_zoning` |
+| Source | Ames Housing, De Cock (2011) 기반 과제 데이터 |
+| Train | **2,344행**, 타깃 포함 사용 컬럼 31개 |
+| Private Test | **586행**, 정답 라벨 없이 최종 예측에만 사용 |
+| Target | 주택 판매가 `sale_price`, 원본 금액 단위 유지 |
+| Features | 면적, 입지, 품질, 건축 연도 등 주택 특성 |
+| Metric | **RMSE**, 예측 오차를 가격 단위로 나타낸 값이며 작을수록 좋음 |
 
-> 변수 정의·전처리 매핑 상세: [`data/README.md`](data/README.md).
+원자료는 저장소에 미포함. 입력 파일과 변수 정의는 [Data 안내](data/README.md) 참조.
 
----
+## Research Design
 
-## 기술 스택
+1. **평가용 데이터 분리**
 
-| 구분 | 도구 |
-|---|---|
-| 언어 | Python |
-| 데이터 처리 | pandas, numpy |
-| 모델·검증 | scikit-learn (Ridge, Lasso, ElasticNet, Pipeline, ColumnTransformer, GridSearchCV, Nested CV) |
-| 시각화 | matplotlib, seaborn |
+   - 학습 자료의 **20%를 held-out으로 분리**
+   - 모델 선택에는 사용하지 않고 최종 성능 확인에 사용
 
----
+2. **결측값과 범주 처리**
 
-## 변수 생성 및 전처리
+   - 시설이 없는 경우는 별도 값으로 구분하고 나머지 결측값은 중앙값 또는 최빈값으로 대치
+   - 품질 등급은 **순서형 인코딩**, 지역과 건물 유형은 **원-핫 인코딩** 적용
 
-| 단계 | 처리 |
-|---|---|
-| 결측 대치 | 수치형 중앙값 · 범주형 최빈값 (CV 내부 fit — 누수 차단) |
-| 순서형 인코딩 | `exter_qual`·`kitchen_qual`·`bsmt_qual` 등급 매핑(OrdinalEncoder) |
-| 명목형 인코딩 | `neighborhood`·`bldg_type`·`ms_zoning` 원-핫(`min_frequency`로 희소범주 병합) |
-| 표준화 | StandardScaler |
-| 파생변수 | `total_sf`(면적 합) · `house_age`(주택 연령) |
+3. **면적과 연령 변수 생성**
 
-> 로그 변환·이상치 윈저라이징은 실험 후 미채택 — 근거는 Appendix.
+   - `total_sf`: 지하 면적과 지상 거주면적의 합
+   - `house_age`: 판매 연도에서 건축 연도를 뺀 주택 연령
+   - 수치형 변수 표준화, 모든 전처리는 **Pipeline 안에서 fold별 학습**
 
----
+4. **규제 선형모형 비교**
 
-## 모델 비교 및 선택
+   - **Ridge:** 계수 크기를 제한하는 방식
+   - **Lasso:** 일부 계수를 0으로 만드는 방식
+   - **ElasticNet:** 두 규제를 결합하는 방식, 규제 강도와 혼합 비율은 **GridSearchCV**로 선택
 
-Ridge · Lasso · ElasticNet을 inner CV(GridSearchCV)로 튜닝하고, fold 표준편차와 함께 비교했다.
+5. **선택과 성능 측정 분리**
 
-| 모델 | CV RMSE | fold std |
-|---|---:|---:|
-| **ElasticNet (선택)** | **30,077** | 7,384 |
-| Ridge | 30,078 | 7,397 |
-| Lasso | 30,259 | 7,013 |
+   - **Nested CV:** 안쪽 fold에서 설정을 선택하고 바깥쪽 fold에서 오차 측정
+   - 모델별 CV RMSE와 fold 표준편차 비교, held-out에서 별도 평가
 
-> 모델 간 최대 차이(182)는 fold 표준편차(약 7,400)의 2.5% 수준 → 순위는 통계적 노이즈에 가깝다. ElasticNet은 성능 우위가 아니라 이중 규제(L1+L2)의 견고성을 근거로 선택.
+6. **최종 예측과 해석**
 
----
+   - 전체 학습 자료로 ElasticNet을 재학습해 **Private Test 가격 예측**
+   - 학습된 계수로 가격과 주택 특성의 관계 확인
 
-## 성능 평가
+## Analysis Workflow
 
-- Nested CV — 하이퍼파라미터 선택과 성능 추정을 분리해 비편향 일반화 성능을 추정.
-- Held-out 테스트 — 선택과 독립된 최종 확인.
-
----
-
-## 주요 결과
-
-- 세 규제 모형의 CV RMSE는 30,077–30,259로, 차이가 fold 변동성 안에 들어온다 → 모델 선택보다 feature engineering·검증 설계가 성능을 좌우.
-- 변수 중요도는 전체 데이터로 재적합한 계수 기반으로 산출(노트북 §6, 결론은 §8). 입지(`neighborhood`)·건물 유형(`bldg_type`)·지상 거주면적(`gr_liv_area`)·전반적 품질(`overall_qual`) 순으로 가격에 영향을 미쳤다.
-
----
-
-## 인사이트
-
-- 후보 모델 간 성능차가 노이즈 수준이라는 것 자체가 결과 — "어떤 규제모형이냐"에 과의미 부여하지 않는다.
-- 파생변수(`total_sf`)를 실제 학습에 반영했는지, 전처리를 CV 안에서 했는지가 성능·해석의 신뢰도를 결정.
-
----
-
-## 역할
-
-| 영역 | 기여 |
-|---|---|
-| 문제 정의 | 점수 경쟁이 아닌 "모델 비교·선택의 정직한 해석"으로 목표 설정 |
-| Feature Engineering | 결측·인코딩·표준화·파생변수 설계 |
-| 모델링 | Ridge/Lasso/ElasticNet inner-CV 튜닝, fold std 병기 |
-| 검증 | Nested CV 비편향 추정 · held-out 확인 |
-
-**정직한 경계.** 모델 간 성능차는 노이즈 수준으로 SOTA 주장 아님 · 관측 데이터 예측이며 인과 아님 · 원본 노트북의 결함을 수정한 재현본이 정본.
-
----
-
-## 배운 점
-
-모델을 완성한 뒤 직접 감사하여, 보고서가 설명하는 모델과 실제 학습 모델이 다르다는 점을 발견하고 누수 없는 재현 파이프라인으로 재구축했다.
-
-| 발견 | 수정 |
-|---|---|
-| 파생변수(`total_sf`·`house_age`)가 최종 모델에 미반영 | 파이프라인에 실제 반영 |
-| 결측 대치·스케일링을 CV 밖에서 fit(누수) | CV 내부로 이동 |
-| 모델 선택 CV로 성능까지 보고(낙관 편향) | Nested CV로 비편향 추정 분리 |
-| 변수 중요도 해석이 코드로 산출된 적 없음 | 실제 coefficient 산출 |
-
-> 감사 전 과정: [`audit/audit_report.md`](audit/audit_report.md).
-
----
-
-## 부록
-
-<details>
-<summary><b>의사결정 기록</b></summary>
-
-<br>
-
-- 로그 변환 미채택 — `sale_price` 우편향에 log1p를 실험했으나 변별력·해석(금액 기준) 측면에서 원 스케일 유지.
-- 윈저라이징 미적용 — 고가 주택을 이상치로 잘라내기보다 원본성 유지, 규제로 대응.
-- 명시적 단계 vs Pipeline — 정정본은 누수 차단을 위해 전처리를 CV 파이프라인 안으로 통합.
-
-원본·정정 보고서: [`reports/`](reports/).
-
-</details>
-
-<details>
-<summary><b>재현</b></summary>
-
-<br>
-
-```bash
-git clone https://github.com/jiwooo411/Real-Estate-Price-Prediction.git
-cd Real-Estate-Price-Prediction
-pip install -r requirements.txt
-# data/README.md 안내대로 data/raw/ 에 원본 CSV 배치
-jupyter notebook notebooks/01_final_model_corrected.ipynb
+```mermaid
+flowchart LR
+    A["주택 자료 로드"] --> B["학습 / Held-out 분리"]
+    B --> C["전처리, 파생변수<br/>Pipeline"]
+    C --> D["Ridge / Lasso / ElasticNet<br/>CV 비교, 튜닝"]
+    D --> E["Nested CV<br/>Held-out 평가"]
+    E --> F["전체 자료 재학습<br/>계수, Private 예측"]
+    classDef step fill:#ede9fe,stroke:#8b5cf6,color:#111827;
+    class B,C,D,E step;
 ```
 
-</details>
+## Key Results
 
----
+### Model Comparison
 
-## 저장소 구조
+- 기존 5-fold CV 결과에서 **ElasticNet RMSE 30,077**, Ridge 30,078, Lasso 30,259 기록
+- 모델 간 최대 차이는 **182**, fold 표준편차는 **7,013~7,397**로 평균 차이보다 큼. 이 결과만으로 특정 모델의 우월성을 단정하기 어려움
+- 최종 모델은 **ElasticNet** 사용
 
+<p align="center">
+  <img src="results/model_comparison.svg" width="820" alt="ElasticNet, Ridge, Lasso의 평균 CV RMSE와 fold 표준편차 비교">
+</p>
+<p align="center"><sub>기존 cv_results.csv의 평균 RMSE와 ±1 fold 표준편차. 신뢰구간이나 Nested CV 결과가 아님.</sub></p>
+
+### Held-out Performance
+
+- 학습 자료에서 분리한 **20% held-out** 기준 **RMSE 22,446**, **R² 0.907** 기록
+- 단일 분할 결과이며, 앞의 CV 평균과는 평가 표본 및 방식이 다름
+
+## Limitations
+
+- **분할 민감성:** fold별 오차 변동이 커 평균 점수만으로 모델 간 차이를 판단하기 어려움
+- **적용 범위:** Ames 주택 자료의 결과이며 다른 지역이나 시점의 성능은 확인되지 않음
+- **계수 해석:** 전처리와 다른 변수의 영향을 함께 받은 예측 계수이며 인과효과를 의미하지 않음
+- **Private Test:** 정답 라벨이 없어 저장된 예측만으로 성능 계산 불가
+
+## Repository Structure
+
+```text
+├── notebooks/   # 최종 모델 코드와 실행 안내
+├── results/     # 모델 비교, 결과 그림, 예측 파일
+├── reports/     # 분석 보고서
+├── data/        # 데이터 배치와 변수 안내
+└── audit/       # 기존 모델 검토 기록
 ```
-.
-├── notebooks/   # 01_final_model_corrected(정본) · 02_report_annotated(보고서 주석본)
-├── data/        # 데이터 설명 (원본 미포함) → data/README.md
-├── audit/       # 감사 보고서 (Lessons 근거)
-├── reports/     # 보고서 원본·정정본 (PDF)
-├── results/     # cv_results.csv · 예측 산출·그림
-└── archive/     # 초기 과정·구버전 노트북 (비정본 보존)
-```
+
+[Notebooks](notebooks/README.md), [Results](results/README.md), [Reports](reports/README.md)
+
