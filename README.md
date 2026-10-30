@@ -2,7 +2,7 @@
 
 ## Overview
 
-Ames 주택 특성으로 **판매가를 예측**하고 Ridge, Lasso, ElasticNet의 오차를 비교한 개인 프로젝트. 모델별 평균 오차와 교차검증 fold의 변동성을 함께 확인.
+Ames 주택 특성으로 **판매가를 예측**하고 Ridge, Lasso, ElasticNet의 오차를 비교. 모델별 평균 오차와 교차검증 fold의 변동성을 함께 확인.
 
 ![Python](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white) ![pandas](https://img.shields.io/badge/pandas-150458?style=flat&logo=pandas&logoColor=white) ![scikit-learn](https://img.shields.io/badge/scikit--learn-F7931E?style=flat&logo=scikitlearn&logoColor=white)
 
@@ -21,12 +21,37 @@ Ames 주택 특성으로 **판매가를 예측**하고 Ridge, Lasso, ElasticNet�
 
 ## Research Design
 
-- **1. 평가용 데이터 분리:** 학습 자료의 **20%를 held-out으로 분리**. 모델을 선택할 때 사용하지 않고 최종 성능 확인에 사용
-- **2. 결측값과 범주 처리:** 시설이 없는 경우는 별도 값으로 구분하고, 나머지 결측값은 중앙값 또는 최빈값으로 대치. 품질 등급은 순서형 인코딩, 지역과 건물 유형은 원-핫 인코딩 적용
-- **3. 면적과 연령 변수 생성:** 지하 면적과 지상 거주면적을 더한 `total_sf`, 판매 연도에서 건축 연도를 뺀 `house_age` 추가. 수치형 변수는 표준화하고 모든 전처리는 **Pipeline 안에서 fold별 학습**
-- **4. 규제 선형모형 비교:** 계수 크기를 제한하는 Ridge, 일부 계수를 0으로 만드는 Lasso, 두 방식을 결합한 ElasticNet 비교. ElasticNet의 규제 강도와 혼합 비율은 **GridSearchCV**로 선택
-- **5. 선택과 성능 측정 분리:** **Nested CV**의 안쪽 fold에서 설정을 선택하고 바깥쪽 fold에서 오차 측정. 모델별 CV RMSE와 fold 표준편차를 비교하고 held-out에서 별도 평가
-- **6. 최종 예측과 해석:** 전체 학습 자료로 ElasticNet을 재학습해 Private Test 가격 예측. 학습된 계수로 가격과 주택 특성의 관계 확인
+1. **평가용 데이터 분리**
+
+   - 학습 자료의 **20%를 held-out으로 분리**
+   - 모델 선택에는 사용하지 않고 최종 성능 확인에 사용
+
+2. **결측값과 범주 처리**
+
+   - 시설이 없는 경우는 별도 값으로 구분하고 나머지 결측값은 중앙값 또는 최빈값으로 대치
+   - 품질 등급은 **순서형 인코딩**, 지역과 건물 유형은 **원-핫 인코딩** 적용
+
+3. **면적과 연령 변수 생성**
+
+   - `total_sf`: 지하 면적과 지상 거주면적의 합
+   - `house_age`: 판매 연도에서 건축 연도를 뺀 주택 연령
+   - 수치형 변수 표준화, 모든 전처리는 **Pipeline 안에서 fold별 학습**
+
+4. **규제 선형모형 비교**
+
+   - **Ridge:** 계수 크기를 제한하는 방식
+   - **Lasso:** 일부 계수를 0으로 만드는 방식
+   - **ElasticNet:** 두 규제를 결합하는 방식, 규제 강도와 혼합 비율은 **GridSearchCV**로 선택
+
+5. **선택과 성능 측정 분리**
+
+   - **Nested CV:** 안쪽 fold에서 설정을 선택하고 바깥쪽 fold에서 오차 측정
+   - 모델별 CV RMSE와 fold 표준편차 비교, held-out에서 별도 평가
+
+6. **최종 예측과 해석**
+
+   - 전체 학습 자료로 ElasticNet을 재학습해 **Private Test 가격 예측**
+   - 학습된 계수로 가격과 주택 특성의 관계 확인
 
 ## Analysis Workflow
 
